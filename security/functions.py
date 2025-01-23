@@ -1,8 +1,14 @@
 from argon2 import PasswordHasher
+from datetime import datetime,timedelta,timezone
 from cryptography.fernet import Fernet
 from model.user import RegisteredUserType
+import jwt
+import os
 
 ph = PasswordHasher()
+
+SECRET_KEY = os.getenv("SECRET_KEY")
+ALGORITHM = os.getenv("ALGORITHM")
 
 def password_hasher(password: str) -> str:
     return ph.hash(password)
@@ -35,3 +41,13 @@ def filter_user(user:RegisteredUserType):
         "email":user["email"],
         "phoneNumber":user["phoneNumber"]
     }
+
+def create_access_token(data:dict, expires_delta:timedelta | None = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.now(timezone.utc) + expires_delta
+    else:
+        expire = datetime.now(timezone.utc) + timedelta(minutes=15)
+    to_encode.update({"exp":expire})
+    encoded_jwt = jwt.encode(to_encode,SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
