@@ -1,14 +1,17 @@
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Request, HTTPException,WebSocket, WebSocketDisconnect
 from security.limiter import limiter
 from security.functions import password_hasher, password_verify, encrypt_data,decrypt_data,filter_user
 from pymongo import MongoClient
 from model.user import UserLoginType, UserRegisterType, RegisteredUserType
+from typing import List
 import os
 
 MONGO_DB_URI = os.getenv("MONGO_DB_URI")
 client = MongoClient(MONGO_DB_URI)
 db = client['SocialBubbles']
 collection = db['users']
+
+active_connections: List[WebSocket] = []
 
 router = APIRouter()
 
@@ -46,3 +49,18 @@ async def login_user(request: Request):
             return user_details_filtered
         else:
              raise HTTPException(status_code=401, detail="Password is incorrect")
+
+
+@router.websocket("/ws/bubble_message")
+async def littleBubbleMessage(websocket:WebSocket):
+    await websocket.accept()
+    active_connections.append(websocket)
+    try:
+        while True:
+            bubble_message = await websocket.receive_text()
+            for connection in active_connections:
+                      await connection.send_text(f"Broadcast: {bubble_message}")
+    except WebSocketDisconnect:
+         active_connections.remove(websocket)
+    finally:
+         await websocket.close()
